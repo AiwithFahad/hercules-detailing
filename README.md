@@ -1,5 +1,7 @@
 # Hercules Detailing — AI Voice Receptionist
 
+![Hercules Detailing studio](assets/banner.jpg)
+
 **Premium car detailing, booked by voice.** A 24/7 AI receptionist that answers on the website by voice or text, checks the live calendar, sizes the slot to the vehicle, and books, moves or cancels appointments — confirming everything by email.
 
 🔗 **Live:** https://hercules-car.netlify.app/
@@ -15,6 +17,17 @@
 - **Answers questions** — packages, prices, individual services and opening hours, straight from the business data
 - **Registers customers** — new callers are added to the CRM with their vehicle details; returning customers are recognised by email and greeted by name
 - **Reports every conversation** — after each call, the transcript, a summary and structured data (customer, intent, booking ID, outcome) are logged automatically to Google Sheets
+
+## Try the receptionist
+
+Open the [live site](https://hercules-car.netlify.app/), press **Start talking** (or type in the chat), and say something like:
+
+- “I'd like a Full Detail for my SUV this Saturday.”
+- “What are your prices?”
+- “I need to move my booking to next week.”
+- “Cancel my appointment, please.”
+
+Have ready: your email, your car's year, make and model, and the day you'd prefer. From hello to booked takes about two minutes.
 
 ## Packages
 
