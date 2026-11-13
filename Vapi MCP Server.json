@@ -1,0 +1,1679 @@
+{
+  "name": "Vapi MCP Server",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "16e081d9-f84a-4867-8345-0d18985d7416",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "44cfa335-2eaf-4547-9a9b-d01b7325816a",
+      "name": "Tool Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        928
+      ],
+      "webhookId": "13ab2cec-e87e-4342-9f3f-d7368e7c55a4"
+    },
+    {
+      "parameters": {
+        "jsCode": "const SECRET = 'hx_7Kq2vP9mWn4Rt8Ys3Lb6Df1Gh5Jz';\nconst ADMIN_USERS = ['admin321@example.com', 'admin321@exampl.com', 'admin321'], ADMIN_PASS = 'Admin321';\nconst r = $input.first().json;\nconst h = r.headers || {};\nlet b = r.body || {};\nif (typeof b === 'string') { try { b = JSON.parse(b); } catch (e) { b = {}; } }\nconst args = (b.args && typeof b.args === 'object') ? b.args : (b.parameters && typeof b.parameters === 'object' ? b.parameters : b);\nlet tool = String(b.tool || b.name || args.tool || (r.query || {}).tool || '').trim().toLowerCase();\nlet authorized = (h['x-hercules-key'] || (r.query || {}).key) === SECRET;\nlet admin = false;\nif (tool.startsWith('admin_')) {\n  admin = ADMIN_USERS.includes(String(b.adminUser || '').trim().toLowerCase()) && String(b.adminPass || '').trim() === ADMIN_PASS;\n  authorized = admin;\n  const map = { admin_login: 'admin_snapshot', admin_snapshot: 'admin_snapshot', admin_cancel: 'cancel_appointment', admin_reschedule: 'reschedule_appointment', admin_availability: 'check_availability', admin_create_booking: 'book_appointment', admin_save_customer: 'register_customer', admin_delete_customer: 'admin_delete_customer', admin_row_create: 'admin_row', admin_row_update: 'admin_row', admin_row_delete: 'admin_row' };\n  if (['admin_row_create','admin_row_update','admin_row_delete'].includes(tool)) args.op = tool.replace('admin_row_', '');\n  tool = map[tool] || 'unknown';\n  if (args && typeof args === 'object') { delete args.adminPass; delete args.adminUser; if (tool !== 'admin_row') args.source = 'admin'; }\n}\nreturn [{ json: { authorized, admin, tool, args, receivedAt: new Date().toISOString() } }];"
+      },
+      "id": "a8689ce1-3966-4b48-8cb5-42d15c0ca8f1",
+      "name": "Normalize Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.authorized }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f5cf20c9-fe81-4bb8-996c-56bc6cb92d9a",
+      "name": "Authorized?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 12,
+        "output": "={{ (() => { const i = ['client_lookup','register_customer','check_availability','book_appointment','lookup_appointment','reschedule_appointment','cancel_appointment','business_info','admin_snapshot','admin_delete_customer','admin_row'].indexOf($json.tool); return i < 0 ? 11 : i; })() }}"
+      },
+      "id": "ab332a78-446d-4bcf-9082-7b103a03c01f",
+      "name": "Route Tool",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        672,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "KOSRDqziBLlzRJhP",
+          "cachedResultName": "Client Lookup"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true,
+          "value": {
+            "email": "={{ $json.args.email || \"\" }}",
+            "phone": "={{ $json.args.phone || $json.args.phoneNumber || \"\" }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "9b8a0692-6aaa-4bfd-83b8-cb84ef292f5d",
+      "name": "Call 'Client Lookup'",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "f7204971-9e51-40d2-bd69-882fc1864630",
+      "name": "Respond to Tool",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1120,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YE3K7bL3IoT51myS",
+          "cachedResultName": "New Client CRM"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true,
+          "value": {
+            "email": "={{ $json.args.email || \"\" }}",
+            "fullName": "={{ $json.args.fullName || $json.args.name || \"\" }}",
+            "phoneNumber": "={{ $json.args.phoneNumber || $json.args.phone || \"\" }}",
+            "vehicleMake": "={{ $json.args.vehicleMake || \"\" }}",
+            "vehicleModel": "={{ $json.args.vehicleModel || \"\" }}",
+            "vehicleYear": "={{ $json.args.vehicleYear || \"\" }}",
+            "vehicleType": "={{ $json.args.vehicleType || \"\" }}",
+            "registration": "={{ $json.args.registration || \"\" }}",
+            "source": "={{ $json.args.source || \"voice\" }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "4d51d697-a0e0-4ae1-9d41-931e0b5aab3a",
+      "name": "Call 'New Client CRM'",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "fWLvHyyDDIsRVvh7",
+          "cachedResultName": "Check Availability"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true,
+          "value": {
+            "date": "={{ $json.args.date || \"\" }}",
+            "service": "={{ $json.args.service || \"\" }}",
+            "vehicleType": "={{ $json.args.vehicleType || \"\" }}",
+            "afterTime": "={{ $json.args.afterTime || \"\" }}",
+            "beforeTime": "={{ $json.args.beforeTime || \"\" }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "07052232-649d-40f0-818c-35e213cc7ff5",
+      "name": "Call 'Check Availability'",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "x5cDKRKSIP244r60",
+          "cachedResultName": "Book Event"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true,
+          "value": {
+            "startTime": "={{ $json.args.startTime || \"\" }}",
+            "email": "={{ $json.args.email || \"\" }}",
+            "fullName": "={{ $json.args.fullName || $json.args.name || \"\" }}",
+            "phoneNumber": "={{ $json.args.phoneNumber || $json.args.phone || \"\" }}",
+            "service": "={{ $json.args.service || $json.args.eventSummary || \"\" }}",
+            "vehicle": "={{ $json.args.vehicle || \"\" }}",
+            "vehicleType": "={{ $json.args.vehicleType || \"\" }}",
+            "notes": "={{ $json.args.notes || \"\" }}",
+            "source": "={{ $json.args.source || \"voice\" }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "59aedd5d-8e47-49f8-baf7-6a2d0bf79967",
+      "name": "Call 'Book Event'",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "NDOyXFtSCHH9TTHU",
+          "cachedResultName": "Lookup Appointment"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true,
+          "value": {
+            "email": "={{ $json.args.email || \"\" }}",
+            "phone": "={{ $json.args.phone || $json.args.phoneNumber || \"\" }}",
+            "bookingId": "={{ $json.args.bookingId || \"\" }}",
+            "afterTime": "={{ $json.args.afterTime || \"\" }}",
+            "beforeTime": "={{ $json.args.beforeTime || \"\" }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "7a2941d8-bc9d-4b3e-b281-9ce0350a3b43",
+      "name": "Call 'Lookup Appointment'",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "thAOEcxZeJ00t9ad",
+          "cachedResultName": "Update Appointment"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true,
+          "value": {
+            "bookingId": "={{ $json.args.bookingId || \"\" }}",
+            "newStartTime": "={{ $json.args.newStartTime || $json.args.startTime || \"\" }}",
+            "eventID": "={{ $json.args.eventID || \"\" }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "412d1c21-cdcb-4bb1-a5e5-d56efad0d1c3",
+      "name": "Call 'Update Appointment'",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "c86nbezlQP6owG7W",
+          "cachedResultName": "Delete Appointment"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true,
+          "value": {
+            "bookingId": "={{ $json.args.bookingId || \"\" }}",
+            "eventID": "={{ $json.args.eventID || \"\" }}",
+            "reason": "={{ $json.args.reason || \"Customer request\" }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "4b9689fc-6044-4dbd-95b6-6d9d790f6fbb",
+      "name": "Call 'Delete Appointment'",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        1152
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\"success\":true,\"business\":\"Hercules Detailing\",\"timezone\":\"America/New_York\",\"hours\":\"Monday to Saturday 8:00 AM to 6:00 PM. Closed Sunday.\",\"packages\":[{\"name\":\"Maintenance\",\"price\":89,\"includes\":\"Exterior Hand Wash, quick interior vacuum, glass\",\"minutes\":60},{\"name\":\"Full Detail\",\"price\":249,\"includes\":\"Exterior wash, Interior Deep Clean, Leather & Fabric Care, Wheels & Engine Bay\",\"minutes\":240},{\"name\":\"Ceramic Pro\",\"price\":899,\"includes\":\"Full Detail plus paint enhancement and Ceramic Coating\",\"minutes\":480}],\"services\":[{\"name\":\"Exterior Hand Wash\",\"minutes\":60},{\"name\":\"Interior Deep Clean\",\"minutes\":120},{\"name\":\"Paint Correction\",\"minutes\":\"240-480\"},{\"name\":\"Ceramic Coating\",\"minutes\":\"about a full day\"},{\"name\":\"Leather & Fabric Care\",\"minutes\":90},{\"name\":\"Wheels & Engine Bay\",\"minutes\":90}],\"vehicles\":\"Sedans, hatchbacks, SUVs, trucks, vans and classic vehicles. Larger vehicles get about 25% more time.\",\"message\":\"Packages: Maintenance $89, Full Detail $249, Ceramic Pro $899. Individual services are quoted or included in packages.\"}",
+        "options": {}
+      },
+      "id": "26182aae-2f25-439a-87f9-a1eae9270cb1",
+      "name": "Business Info",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        1344
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "u1",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "u2",
+              "name": "message",
+              "value": "=Unknown tool \"{{ $json.tool }}\".",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dc528cdf-6f2e-4343-9b8f-9336d9da3777",
+      "name": "Unknown Tool",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        1536
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"success\":false,\"message\":\"Unauthorized\"}",
+        "options": {
+          "responseCode": 401,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "bbefefe2-d71a-4c7b-9f90-e22cca41ad40",
+      "name": "Respond Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        672,
+        1072
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Customers"
+        },
+        "options": {}
+      },
+      "id": "f11b1cac-3e23-4355-83f8-a61985216c6b",
+      "name": "Read Customers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        912,
+        1312
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Bookings"
+        },
+        "options": {}
+      },
+      "id": "79a9ca87-564a-4e97-97f5-da4b41852a2d",
+      "name": "Read Bookings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1104,
+        1312
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Conversations"
+        },
+        "options": {}
+      },
+      "id": "cce39324-230b-4d7f-b844-3db4b68283a2",
+      "name": "Read Conversations",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1312,
+        1312
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Transcripts"
+        },
+        "options": {}
+      },
+      "id": "d36d1e45-24ea-4b0c-9a52-826bff5bba03",
+      "name": "Read Transcripts",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1504,
+        1312
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "AI Summaries"
+        },
+        "options": {}
+      },
+      "id": "cb09abb1-2828-4d7f-b0e9-f97376f6603f",
+      "name": "Read AI Summaries",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1712,
+        1312
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = (n) => $(n).all().map(i => i.json).filter(r => r && Object.keys(r).length > 1);\nconst customers = rows('Read Customers').filter(r => r.Email);\nconst bookings = rows('Read Bookings').filter(r => r['Booking ID']);\nconst transcripts = rows('Read Transcripts').filter(r => r['Conversation ID']);\nconst summaries = rows('Read AI Summaries').filter(r => r['Conversation ID']);\nconst tmap = Object.fromEntries(transcripts.map(t => [t['Conversation ID'], t]));\nconst smap = Object.fromEntries(summaries.map(s => [s['Conversation ID'], s]));\nconst convs = rows('Read Conversations').filter(r => r['Conversation ID']).map(c => ({ ...c, Transcript: (tmap[c['Conversation ID']] || {}).Transcript || '', Summary: (smap[c['Conversation ID']] || {}).Summary || '', _tRow: (tmap[c['Conversation ID']] || {}).row_number || null, _sRow: (smap[c['Conversation ID']] || {}).row_number || null }));\nconst services = rows('Read Services').filter(r => r.Service);\nconst packages = rows('Read Packages').filter(r => r.Package);\nconst activity = rows('Read Admin Activity').filter(r => r.Timestamp).slice(-200).reverse();\nreturn [{ json: { success: true, generatedAt: new Date().toISOString(), customers, bookings, conversations: convs, transcripts, summaries, services, packages, activity, hours: 'Mon-Sat 08:00-18:00 Eastern, Sunday closed' } }];"
+      },
+      "id": "932e664a-9cfc-4ec3-b885-1b8b5982f417",
+      "name": "Assemble Admin Snapshot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1904,
+        1312
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Customers"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Email",
+              "lookupValue": "={{ String($json.args.email || '').trim().toLowerCase() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "083ca059-7c8a-4a1d-815b-284a49f95158",
+      "name": "Find Customer Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        912,
+        1504
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.row_number }}",
+              "operator": {
+                "operation": "exists",
+                "singleValue": true,
+                "type": "number"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "7200fcbb-c898-4991-93e7-b639c511fade",
+      "name": "Customer Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1104,
+        1504
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "id",
+          "value": 0
+        },
+        "startIndex": "={{ $json.row_number }}"
+      },
+      "id": "f34a3187-5f4c-48ec-b149-5b4497a65eda",
+      "name": "Delete Customer Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1312,
+        1440
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cd1",
+              "name": "success",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "cd2",
+              "name": "message",
+              "type": "string",
+              "value": "=Customer {{ $('Find Customer Row').item.json.Email }} deleted. Their booking history is kept."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "13b08381-74c7-4145-9e2e-15a9df1117e9",
+      "name": "Customer Deleted",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1504,
+        1440
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cn1",
+              "name": "success",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "cn2",
+              "name": "message",
+              "type": "string",
+              "value": "No customer with that email."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "706452a8-2254-490f-886d-5f3e64c7fb19",
+      "name": "Customer Not Found",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1312,
+        1584
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ALLOWED = ['Customers','Bookings','Services','Packages','Conversations','Transcripts','AI Summaries','Cancellations','Rescheduling History'];\nconst a = $input.first().json.args || {};\nconst op = String(a.op || '');\nconst sheet = String(a.sheet || '');\nif (!ALLOWED.includes(sheet)) return [{ json: { op: 'invalid', message: 'Sheet not allowed: ' + sheet } }];\nconst row = {};\nfor (const [k, v] of Object.entries(a.row || {})) { if (k !== 'row_number' && typeof v !== 'object') row[k] = v === null || v === undefined ? '' : String(v); }\nconst rn = parseInt(a.row_number, 10);\nif ((op === 'update' || op === 'delete') && !(rn >= 2)) return [{ json: { op: 'invalid', message: 'A valid row_number is required.' } }];\nif ((op === 'create' || op === 'update') && !Object.keys(row).length) return [{ json: { op: 'invalid', message: 'No fields to save.' } }];\nif (op === 'update') row.row_number = rn;\nreturn [{ json: { op, sheet, row_number: rn || null, row, summary: `${op} ${sheet}${rn ? ' row ' + rn : ''}`, details: JSON.stringify(row).slice(0, 400) } }];"
+      },
+      "id": "a895c170-fff3-451b-b29f-6a56ac22b0dc",
+      "name": "Prepare Row Operation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "output": "={{ ({create:0, update:1, delete:2})[$json.op] ?? 3 }}"
+      },
+      "id": "bde10430-a29d-442f-b551-bf3d559d1761",
+      "name": "Row Op Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1104,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $input.first().json.row }];"
+      },
+      "id": "80687727-182e-4e7d-98ec-14c95a63a117",
+      "name": "Row Create Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        1664
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $('Prepare Row Operation').item.json.sheet }}"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": [],
+          "schema": [],
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "0cee424a-67b3-4fcf-9775-b7482bd976c9",
+      "name": "Append Sheet Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1504,
+        1664
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $input.first().json.row }];"
+      },
+      "id": "228cb629-a127-4fa7-91f2-d13ebe35bb20",
+      "name": "Row Update Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $('Prepare Row Operation').item.json.sheet }}"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [],
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "1a447f5c-9278-4951-a1a3-65832aab0dc0",
+      "name": "Update Sheet Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1504,
+        1760
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $json.sheet }}"
+        },
+        "startIndex": "={{ $json.row_number }}"
+      },
+      "id": "c590bd56-75f9-4812-bc76-ecd4afed3255",
+      "name": "Delete Sheet Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1504,
+        1856
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Admin Activity"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Timestamp",
+              "id": "Timestamp",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Admin",
+              "id": "Admin",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Action",
+              "id": "Action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Target",
+              "id": "Target",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Details",
+              "id": "Details",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "Action": "={{ $('Prepare Row Operation').item.json.op }}",
+            "Admin": "admin",
+            "Details": "={{ $('Prepare Row Operation').item.json.details }}",
+            "Target": "={{ $('Prepare Row Operation').item.json.sheet }}{{ $('Prepare Row Operation').item.json.row_number ? ' row ' + $('Prepare Row Operation').item.json.row_number : '' }}",
+            "Timestamp": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "45ec3a0d-427f-41ef-86ee-8fba9550fc77",
+      "name": "Log Admin Activity",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1712,
+        1760
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ro1",
+              "name": "success",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "ro2",
+              "name": "message",
+              "type": "string",
+              "value": "=Saved: {{ $('Prepare Row Operation').item.json.summary }}."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "afa5cd34-d107-40d6-ae24-38cde0b66ad6",
+      "name": "Row Op Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1904,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ri1",
+              "name": "success",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "ri2",
+              "name": "message",
+              "type": "string",
+              "value": "={{ $json.message || 'Invalid operation.' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ad6561cc-50bc-4143-acc2-14a720a3449d",
+      "name": "Row Op Invalid",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1312,
+        1952
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Services"
+        },
+        "options": {}
+      },
+      "id": "066df9ac-fd7b-46bb-b787-946d5e800d52",
+      "name": "Read Services",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1712,
+        1104
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Packages"
+        },
+        "options": {}
+      },
+      "id": "28001adc-5d9a-4f14-a87d-8804d5d7fc88",
+      "name": "Read Packages",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1904,
+        1104
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Admin Activity"
+        },
+        "options": {}
+      },
+      "id": "2d719f00-15cc-4629-9632-eaeaccb134f5",
+      "name": "Read Admin Activity",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2112,
+        1104
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Tool Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Request": {
+      "main": [
+        [
+          {
+            "node": "Authorized?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authorized?": {
+      "main": [
+        [
+          {
+            "node": "Route Tool",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Tool": {
+      "main": [
+        [
+          {
+            "node": "Call 'Client Lookup'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'New Client CRM'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'Check Availability'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'Book Event'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'Lookup Appointment'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'Update Appointment'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'Delete Appointment'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Business Info",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Read Customers",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find Customer Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Row Operation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unknown Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Client Lookup'": {
+      "main": [
+        [
+          {
+            "node": "Respond to Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'New Client CRM'": {
+      "main": [
+        [
+          {
+            "node": "Respond to Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Check Availability'": {
+      "main": [
+        [
+          {
+            "node": "Respond to Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Book Event'": {
+      "main": [
+        [
+          {
+            "node": "Respond to Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Lookup Appointment'": {
+      "main": [
+        [
+          {
+            "node": "Respond to Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Update Appointment'": {
+      "main": [
+        [
+          {
+            "node": "Respond to Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Delete Appointment'": {
+      "main": [
+        [
+          {
+            "node": "Respond to Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Business Info": {
+      "main": [
+        [
+          {
+            "node": "Respond to Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unknown Tool": {
+      "main": [
+        [
+          {
+            "node": "Respond to Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Customers": {
+      "main": [
+        [
+          {
+            "node": "Read Bookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Bookings": {
+      "main": [
+        [
+          {
+            "node": "Read Conversations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Conversations": {
+      "main": [
+        [
+          {
+            "node": "Read Transcripts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Transcripts": {
+      "main": [
+        [
+          {
+            "node": "Read AI Summaries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Admin Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Respond to Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Customer Row": {
+      "main": [
+        [
+          {
+            "node": "Customer Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer Found?": {
+      "main": [
+        [
+          {
+            "node": "Delete Customer Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Customer Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Customer Row": {
+      "main": [
+        [
+          {
+            "node": "Customer Deleted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer Deleted": {
+      "main": [
+        [
+          {
+            "node": "Respond to Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer Not Found": {
+      "main": [
+        [
+          {
+            "node": "Respond to Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Row Operation": {
+      "main": [
+        [
+          {
+            "node": "Row Op Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Row Op Switch": {
+      "main": [
+        [
+          {
+            "node": "Row Create Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Row Update Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Delete Sheet Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Row Op Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Row Create Data": {
+      "main": [
+        [
+          {
+            "node": "Append Sheet Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Row Update Data": {
+      "main": [
+        [
+          {
+            "node": "Update Sheet Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Sheet Row": {
+      "main": [
+        [
+          {
+            "node": "Log Admin Activity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Sheet Row": {
+      "main": [
+        [
+          {
+            "node": "Log Admin Activity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Sheet Row": {
+      "main": [
+        [
+          {
+            "node": "Log Admin Activity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Admin Activity": {
+      "main": [
+        [
+          {
+            "node": "Row Op Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Row Op Result": {
+      "main": [
+        [
+          {
+            "node": "Respond to Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Row Op Invalid": {
+      "main": [
+        [
+          {
+            "node": "Respond to Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read AI Summaries": {
+      "main": [
+        [
+          {
+            "node": "Read Services",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Services": {
+      "main": [
+        [
+          {
+            "node": "Read Packages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Packages": {
+      "main": [
+        [
+          {
+            "node": "Read Admin Activity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Admin Activity": {
+      "main": [
+        [
+          {
+            "node": "Assemble Admin Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "fe11190c-6e2d-4056-a1cc-f948047bb65c",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "10bcb785604853805d20dc557d497c83bb8101ab91677e89309f72489df54257"
+  },
+  "nodeGroups": [],
+  "id": "fuj705txZ0n65PNE",
+  "tags": []
+}

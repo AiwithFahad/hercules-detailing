@@ -1,0 +1,688 @@
+{
+  "name": "Book Event",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "startTime"
+            },
+            {
+              "name": "email"
+            },
+            {
+              "name": "fullName"
+            },
+            {
+              "name": "phoneNumber"
+            },
+            {
+              "name": "service"
+            },
+            {
+              "name": "vehicle"
+            },
+            {
+              "name": "vehicleType"
+            },
+            {
+              "name": "notes"
+            },
+            {
+              "name": "source"
+            }
+          ]
+        }
+      },
+      "id": "d884ea8e-376e-4f04-b105-40e459f0a99a",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const TZ = 'America/New_York';\nconst i = $input.first().json;\nconst DUR = { 'exterior hand wash': 60, 'maintenance': 60, 'interior deep clean': 120, 'leather & fabric care': 90, 'leather and fabric care': 90, 'wheels & engine bay': 90, 'wheels and engine bay': 90, 'full detail': 240, 'paint correction': 360, 'ceramic coating': 480, 'ceramic pro': 480 };\nconst NAMES = { 'exterior hand wash': 'Exterior Hand Wash', 'maintenance': 'Maintenance Package', 'interior deep clean': 'Interior Deep Clean', 'leather & fabric care': 'Leather & Fabric Care', 'leather and fabric care': 'Leather & Fabric Care', 'wheels & engine bay': 'Wheels & Engine Bay', 'wheels and engine bay': 'Wheels & Engine Bay', 'full detail': 'Full Detail Package', 'paint correction': 'Paint Correction', 'ceramic coating': 'Ceramic Coating', 'ceramic pro': 'Ceramic Pro Package' };\nconst fail = (m) => [{ json: { valid: false, message: m } }];\nconst email = String(i.email || '').trim().toLowerCase();\nif (!/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)) return fail('A valid customer email is required before booking.');\nconst svc = String(i.service || '').trim().toLowerCase();\nconst key = Object.keys(DUR).find(k => svc.includes(k));\nif (!key) return fail('Unknown service. Choose one of: Exterior Hand Wash, Interior Deep Clean, Paint Correction, Ceramic Coating, Leather & Fabric Care, Wheels & Engine Bay, or the Maintenance, Full Detail or Ceramic Pro package.');\nconst start = DateTime.fromISO(String(i.startTime || ''), { setZone: true }).setZone(TZ);\nif (!start.isValid) return fail('Start time must be a full ISO date-time, e.g. 2026-11-06T09:00:00-05:00.');\nconst big = /suv|truck|van|pickup|classic|4x4|minivan/.test(String(i.vehicleType || i.vehicle || '').toLowerCase());\nconst base = DUR[key];\nconst duration = Math.min(Math.ceil((big && base < 480 ? base * 1.25 : base) / 30) * 30, 600);\nconst end = start.plus({ minutes: duration });\nif (start.weekday === 7) return fail('We are closed on Sundays. Please choose Monday to Saturday.');\nconst open = start.set({ hour: 8, minute: 0, second: 0, millisecond: 0 });\nconst close = start.set({ hour: 18, minute: 0, second: 0, millisecond: 0 });\nif (start < open || end > close) return fail(`A ${duration}-minute ${NAMES[key]} must start at 8:00 AM or later and finish by 6:00 PM. Latest start that day: ${close.minus({ minutes: duration }).toFormat('h:mm a')}.`);\nif (start < DateTime.now().setZone(TZ)) return fail('That time is in the past. Please choose a future time.');\nconst bookingId = 'HD-' + start.toFormat('yyMMdd') + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();\nreturn [{ json: { valid: true, bookingId, email, fullName: String(i.fullName || '').trim(), phone: String(i.phoneNumber || '').replace(/[^\\d+]/g, ''), service: NAMES[key], vehicle: String(i.vehicle || ''), vehicleType: String(i.vehicleType || ''), notes: String(i.notes || ''), source: String(i.source || 'voice'), durationMinutes: duration, startTime: start.toISO(), endTime: end.toISO(), label: start.toFormat(\"cccc d LLLL 'at' h:mm a\") } }];"
+      },
+      "id": "cf7c8105-e70a-4a65-88de-315261c45334",
+      "name": "Validate Booking",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bbd7ddd9-87c0-414e-8ee7-fca539039673",
+      "name": "Is Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "fahadahmedshanawar@gmail.com"
+        },
+        "returnAll": true,
+        "timeMin": "={{ $json.startTime }}",
+        "timeMax": "={{ $json.endTime }}",
+        "options": {}
+      },
+      "id": "3b90de7a-0acf-4ebc-9c4e-04f35c275cd2",
+      "name": "Get Overlapping Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        96
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "tuLMc4vpTEFITWB9",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('Validate Booking').first().json;\nconst clash = $input.all().map(e => e.json).filter(e => e && e.id && e.status !== 'cancelled' && e.transparency !== 'transparent');\nreturn [{ json: { ...b, free: clash.length === 0 } }];"
+      },
+      "id": "e7b848aa-0b18-4a44-a70f-9dfe1ec33d36",
+      "name": "Check Conflict",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.free }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "57963791-c9be-4ab5-9acc-0aa6e22bc033",
+      "name": "Slot Free?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "fahadahmedshanawar@gmail.com"
+        },
+        "start": "={{ $json.startTime }}",
+        "end": "={{ $json.endTime }}",
+        "additionalFields": {
+          "attendees": [
+            "={{ $json.email }}"
+          ],
+          "description": "=Booking ID: {{ $json.bookingId }}\nCustomer: {{ $json.fullName }}\nEmail: {{ $json.email }}\nPhone: {{ $json.phone }}\nVehicle: {{ $json.vehicle }} ({{ $json.vehicleType }})\nDuration: {{ $json.durationMinutes }} min\nNotes: {{ $json.notes }}\nBooked via: {{ $json.source }}",
+          "summary": "={{ $json.service }} – {{ $json.fullName || $json.email }} ({{ $json.bookingId }})"
+        }
+      },
+      "id": "40e673f5-ce3c-4f7e-b00d-9672b243efad",
+      "name": "Create an event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1344,
+        0
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "tuLMc4vpTEFITWB9",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Bookings"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Booking ID",
+              "displayName": "Booking ID",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Event ID",
+              "displayName": "Event ID",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Customer Name",
+              "displayName": "Customer Name",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Service",
+              "displayName": "Service",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Package",
+              "displayName": "Package",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Vehicle",
+              "displayName": "Vehicle",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Vehicle Type",
+              "displayName": "Vehicle Type",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Start",
+              "displayName": "Start",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "End",
+              "displayName": "End",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Duration (min)",
+              "displayName": "Duration (min)",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Created At",
+              "displayName": "Created At",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Updated At",
+              "displayName": "Updated At",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "value": {
+            "Booking ID": "={{ $(\"Check Conflict\").item.json.bookingId }}",
+            "Event ID": "={{ $json.id }}",
+            "Email": "={{ $(\"Check Conflict\").item.json.email }}",
+            "Customer Name": "={{ $(\"Check Conflict\").item.json.fullName }}",
+            "Phone": "='{{ $(\"Check Conflict\").item.json.phone }}",
+            "Service": "={{ $(\"Check Conflict\").item.json.service }}",
+            "Package": "={{ $(\"Check Conflict\").item.json.service.includes(\"Package\") ? $(\"Check Conflict\").item.json.service : \"\" }}",
+            "Vehicle": "={{ $(\"Check Conflict\").item.json.vehicle }}",
+            "Vehicle Type": "={{ $(\"Check Conflict\").item.json.vehicleType }}",
+            "Start": "={{ $(\"Check Conflict\").item.json.startTime }}",
+            "End": "={{ $(\"Check Conflict\").item.json.endTime }}",
+            "Duration (min)": "={{ $(\"Check Conflict\").item.json.durationMinutes }}",
+            "Status": "Confirmed",
+            "Source": "={{ $(\"Check Conflict\").item.json.source }}",
+            "Created At": "={{ $now.toISO() }}",
+            "Updated At": "={{ $now.toISO() }}",
+            "Notes": "={{ $(\"Check Conflict\").item.json.notes }}"
+          },
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "335e2a70-28bc-4c6b-8023-088d62af57bc",
+      "name": "Append row in sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1568,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1",
+              "name": "success",
+              "type": "boolean",
+              "value": "={{ !!$('Append row in sheet').item.json['Booking ID'] && !!$('Append row in sheet').item.json['Event ID'] }}"
+            },
+            {
+              "id": "b2",
+              "name": "bookingId",
+              "type": "string",
+              "value": "={{ $('Append row in sheet').item.json['Booking ID'] }}"
+            },
+            {
+              "id": "b3",
+              "name": "eventId",
+              "type": "string",
+              "value": "={{ $('Append row in sheet').item.json['Event ID'] }}"
+            },
+            {
+              "id": "b4",
+              "name": "startTime",
+              "type": "string",
+              "value": "={{ $('Append row in sheet').item.json.Start }}"
+            },
+            {
+              "id": "b5",
+              "name": "endTime",
+              "type": "string",
+              "value": "={{ $('Append row in sheet').item.json.End }}"
+            },
+            {
+              "id": "b7",
+              "name": "emailSent",
+              "type": "boolean",
+              "value": "={{ !!$json.id && !$json.error }}"
+            },
+            {
+              "id": "b6",
+              "name": "message",
+              "type": "string",
+              "value": "={{ $('Append row in sheet').item.json['Booking ID'] ? 'Booked: ' + $('Check Conflict').item.json.service + ' on ' + $('Check Conflict').item.json.label + '. Booking ID ' + $('Append row in sheet').item.json['Booking ID'] + '.' + (($json.id && !$json.error) ? ' A confirmation email was sent to ' + $('Append row in sheet').item.json.Email + '.' : '') : 'The booking could not be confirmed in the database. Do not tell the customer it is booked.' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f70ac0b5-f631-41cd-8e7c-8f25c4cc71d6",
+      "name": "Booking Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1792,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "c2",
+              "name": "message",
+              "value": "=That time is already taken for a {{ $json.durationMinutes }}-minute {{ $json.service }}. Check availability and offer another start time.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ce008067-ba21-4c2b-afeb-f51fb1b4af65",
+      "name": "Slot Taken",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1344,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "v1",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "v2",
+              "name": "message",
+              "value": "={{ $json.message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "00ccb349-7134-4d47-892f-450afddb1909",
+      "name": "Validation Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.Email }}",
+        "subject": "=Booking confirmed: {{ $('Check Conflict').item.json.service }} – {{ $json['Booking ID'] }}",
+        "emailType": "text",
+        "message": "=Hi {{ $('Check Conflict').item.json.fullName || 'there' }},\n\nYour Hercules Detailing appointment is confirmed.\n\nBooking ID: {{ $json['Booking ID'] }}\nService: {{ $('Check Conflict').item.json.service }}\nWhen: {{ $('Check Conflict').item.json.label }} (about {{ $('Check Conflict').item.json.durationMinutes }} minutes)\nVehicle: {{ $('Check Conflict').item.json.vehicle }}\n\nNeed to change it? Call or chat with our receptionist and quote your booking ID.\n\nHercules Detailing\nMon-Sat 8:00 AM - 6:00 PM",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "Hercules Detailing"
+        }
+      },
+      "id": "a6e7cbed-a32c-4f00-a1f7-a084d1db48a0",
+      "name": "Send Confirmation Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1712,
+        0
+      ],
+      "webhookId": "c2112c24-006a-40b8-b27c-dc5d92b69b48",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "z05gMQmKoaytEsJa",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Booking": {
+      "main": [
+        [
+          {
+            "node": "Is Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid?": {
+      "main": [
+        [
+          {
+            "node": "Get Overlapping Events",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Overlapping Events": {
+      "main": [
+        [
+          {
+            "node": "Check Conflict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conflict": {
+      "main": [
+        [
+          {
+            "node": "Slot Free?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slot Free?": {
+      "main": [
+        [
+          {
+            "node": "Create an event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slot Taken",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an event": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Confirmation Email": {
+      "main": [
+        [
+          {
+            "node": "Booking Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "timezone": "America/New_York"
+  },
+  "versionId": "e496bbd0-3d40-4628-8e73-30579747dd94",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "10bcb785604853805d20dc557d497c83bb8101ab91677e89309f72489df54257"
+  },
+  "nodeGroups": [],
+  "id": "x5cDKRKSIP244r60",
+  "tags": []
+}

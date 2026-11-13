@@ -1,0 +1,423 @@
+{
+  "name": "Hercules Receptionist EOC Report",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "e72f9562-b2f2-409d-8d22-77bd38ba9841",
+        "options": {}
+      },
+      "id": "efa749d1-e5b4-40d5-9ad6-6336a17829be",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        192
+      ],
+      "webhookId": "45965a0a-cb0b-4284-80a9-a044af477dbb"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst body = raw.body || raw;\nconst d = body.data || body;\nconst a = d.analysis || {};\nconst dc = a.data_collection_results || {};\nconst v = (k) => (dc[k] && dc[k].value !== undefined && dc[k].value !== null) ? String(dc[k].value) : '';\nconst md = d.metadata || {};\nconst start = md.start_time_unix_secs ? new Date(md.start_time_unix_secs * 1000) : new Date();\nconst dur = Number(md.call_duration_secs || 0);\nconst end = new Date(start.getTime() + dur * 1000);\nconst lines = (d.transcript || []).filter(t => t && t.message).map(t => `[${Math.floor((t.time_in_call_secs || 0) / 60)}:${String((t.time_in_call_secs || 0) % 60).padStart(2, '0')}] ${t.role === 'agent' ? 'Receptionist' : 'Customer'}: ${t.message}`);\nconst transcript = lines.join('\\n').slice(0, 49000);\nconst dyn = (d.conversation_initiation_client_data || {}).dynamic_variables || {};\nconst channel = dyn.channel || (md.phone_call ? 'phone' : (lines.length && !dur ? 'text' : 'web'));\nconst outcome = v('call_outcome') || (a.call_successful === 'success' ? 'Resolved' : a.call_successful === 'failure' ? 'Unresolved' : 'Unknown');\nreturn [{ json: {\n  conversationId: d.conversation_id || ('conv-' + Date.now()),\n  startedAt: start.toISOString(),\n  endedAt: end.toISOString(),\n  durationSecs: dur,\n  customerName: v('customer_name'),\n  customerEmail: v('customer_email').toLowerCase(),\n  customerPhone: v('customer_phone'),\n  intent: v('intent') || 'General enquiry',\n  bookingId: v('booking_id'),\n  outcome,\n  bookingStatus: v('booking_status') || 'None',\n  channel,\n  summary: a.transcript_summary || 'No summary generated.',\n  transcript: transcript || '(empty transcript)',\n  loggedAt: new Date().toISOString()\n} }];"
+      },
+      "id": "9c707dae-fede-42e2-809d-4f48d9a25b18",
+      "name": "Parse Conversation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Conversations"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Conversation ID"
+          ],
+          "schema": [
+            {
+              "id": "Conversation ID",
+              "displayName": "Conversation ID",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Started At",
+              "displayName": "Started At",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Ended At",
+              "displayName": "Ended At",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Duration (s)",
+              "displayName": "Duration (s)",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Customer Name",
+              "displayName": "Customer Name",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Customer Email",
+              "displayName": "Customer Email",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Customer Phone",
+              "displayName": "Customer Phone",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Intent",
+              "displayName": "Intent",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Booking ID",
+              "displayName": "Booking ID",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Outcome",
+              "displayName": "Outcome",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Booking Status",
+              "displayName": "Booking Status",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Channel",
+              "displayName": "Channel",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Logged At",
+              "displayName": "Logged At",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "value": {
+            "Conversation ID": "={{ $json.conversationId }}",
+            "Started At": "={{ $json.startedAt }}",
+            "Ended At": "={{ $json.endedAt }}",
+            "Duration (s)": "={{ $json.durationSecs }}",
+            "Customer Name": "={{ $json.customerName }}",
+            "Customer Email": "={{ $json.customerEmail }}",
+            "Customer Phone": "={{ $json.customerPhone }}",
+            "Intent": "={{ $json.intent }}",
+            "Booking ID": "={{ $json.bookingId }}",
+            "Outcome": "={{ $json.outcome }}",
+            "Booking Status": "={{ $json.bookingStatus }}",
+            "Channel": "={{ $json.channel }}",
+            "Logged At": "={{ $json.loggedAt }}"
+          },
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "2fa3466b-856d-4c26-898c-c2d82b0b2c57",
+      "name": "Append row in sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Transcripts"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Conversation ID"
+          ],
+          "schema": [
+            {
+              "id": "Conversation ID",
+              "displayName": "Conversation ID",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Logged At",
+              "displayName": "Logged At",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Transcript",
+              "displayName": "Transcript",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "value": {
+            "Conversation ID": "={{ $json.conversationId }}",
+            "Logged At": "={{ $json.loggedAt }}",
+            "Transcript": "={{ $json.transcript }}"
+          },
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "49885ba5-40cc-4059-ab72-4f7eee0e3f87",
+      "name": "Save Transcript",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        192
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "AI Summaries"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Conversation ID"
+          ],
+          "schema": [
+            {
+              "id": "Conversation ID",
+              "displayName": "Conversation ID",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Logged At",
+              "displayName": "Logged At",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Summary",
+              "displayName": "Summary",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Intent",
+              "displayName": "Intent",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Outcome",
+              "displayName": "Outcome",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "value": {
+            "Conversation ID": "={{ $json.conversationId }}",
+            "Logged At": "={{ $json.loggedAt }}",
+            "Summary": "={{ $json.summary }}",
+            "Intent": "={{ $json.intent }}",
+            "Outcome": "={{ $json.outcome }}"
+          },
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "527ed4a4-8c47-426d-b16f-87c33adbaab0",
+      "name": "Save AI Summary",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        384
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Conversation": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save Transcript",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save AI Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "de3d1271-2453-4f48-bb79-0731c1b6397a",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "10bcb785604853805d20dc557d497c83bb8101ab91677e89309f72489df54257"
+  },
+  "nodeGroups": [],
+  "id": "OdDPU6Q0T0RwVOVX",
+  "tags": []
+}

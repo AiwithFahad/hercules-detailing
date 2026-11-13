@@ -1,0 +1,704 @@
+{
+  "name": "Update Appointment",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "bookingId"
+            },
+            {
+              "name": "newStartTime"
+            },
+            {
+              "name": "eventID"
+            }
+          ]
+        }
+      },
+      "id": "6be800b4-9b3a-4393-a89e-4bcd26ce9afa",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Bookings"
+        },
+        "options": {}
+      },
+      "id": "a8f0e335-bd61-4e1d-9e09-67f55d9033d9",
+      "name": "Get Bookings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        192
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const TZ = 'America/New_York';\nconst i = $('When Executed by Another Workflow').first().json;\nconst fail = (m) => [{ json: { ok: false, message: m } }];\nconst id = String(i.bookingId || '').trim().toUpperCase();\nconst ev = String(i.eventID || '').trim();\nconst rows = $input.all().map(r => r.json).filter(r => r['Booking ID']);\nconst b = rows.find(r => (id && String(r['Booking ID']).toUpperCase() === id) || (ev && r['Event ID'] === ev));\nif (!b) return fail('No booking found with that booking ID. Look up the appointment first.');\nif (b.Status === 'Cancelled') return fail('That booking was cancelled and cannot be rescheduled. Make a new booking instead.');\nconst start = DateTime.fromISO(String(i.newStartTime || ''), { setZone: true }).setZone(TZ);\nif (!start.isValid) return fail('New start time must be a full ISO date-time.');\nconst dur = parseInt(b['Duration (min)'], 10) || 60;\nconst end = start.plus({ minutes: dur });\nif (start.weekday === 7) return fail('We are closed on Sundays.');\nif (start < start.set({ hour: 8, minute: 0 }) || end > start.set({ hour: 18, minute: 0, second: 0 })) return fail(`This ${dur}-minute appointment must fit between 8:00 AM and 6:00 PM.`);\nif (start < DateTime.now().setZone(TZ)) return fail('That time is in the past.');\nreturn [{ json: { ok: true, bookingId: b['Booking ID'], eventId: b['Event ID'], email: b.Email, service: b.Service, oldStart: b.Start, newStart: start.toISO(), newEnd: end.toISO(), durationMinutes: dur, label: start.toFormat(\"cccc d LLLL 'at' h:mm a\") } }];"
+      },
+      "id": "a9a41d47-629d-4787-92da-b09bb2b6a5f0",
+      "name": "Plan Reschedule",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "405cca01-a9a4-40b1-b6c7-7a5a84e82f19",
+      "name": "Can Reschedule?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "fahadahmedshanawar@gmail.com"
+        },
+        "returnAll": true,
+        "timeMin": "={{ $json.newStart }}",
+        "timeMax": "={{ $json.newEnd }}",
+        "options": {}
+      },
+      "id": "fe6f9091-6f39-4100-af17-8149f59980f6",
+      "name": "Get Overlapping Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        896,
+        96
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "tuLMc4vpTEFITWB9",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $('Plan Reschedule').first().json;\nconst clash = $input.all().map(e => e.json).filter(e => e && e.id && e.id !== p.eventId && e.status !== 'cancelled' && e.transparency !== 'transparent');\nreturn [{ json: { ...p, free: clash.length === 0 } }];"
+      },
+      "id": "5c769e77-4417-49be-9e11-aaa9e5b65aad",
+      "name": "Check Conflict",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.free }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "28357a54-2920-493c-9ddc-964edbbe707e",
+      "name": "Slot Free?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1344,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "fahadahmedshanawar@gmail.com"
+        },
+        "eventId": "={{ $json.eventId }}",
+        "updateFields": {
+          "end": "={{ $json.newEnd }}",
+          "start": "={{ $json.newStart }}"
+        }
+      },
+      "id": "2dcda9df-68fd-4543-bf47-dc529d311ca0",
+      "name": "Update an event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1568,
+        0
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "tuLMc4vpTEFITWB9",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Bookings"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Booking ID"
+          ],
+          "schema": [
+            {
+              "id": "Booking ID",
+              "displayName": "Booking ID",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Start",
+              "displayName": "Start",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "End",
+              "displayName": "End",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Updated At",
+              "displayName": "Updated At",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "value": {
+            "Booking ID": "={{ $(\"Check Conflict\").item.json.bookingId }}",
+            "Start": "={{ $(\"Check Conflict\").item.json.newStart }}",
+            "End": "={{ $(\"Check Conflict\").item.json.newEnd }}",
+            "Status": "Rescheduled",
+            "Updated At": "={{ $now.toISO() }}",
+            "Notes": "=Moved from {{ $(\"Check Conflict\").item.json.oldStart }}"
+          },
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "86cf5aad-0cda-4e94-8983-247e4feb554a",
+      "name": "Update row in sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1792,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Rescheduling History"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Booking ID",
+              "displayName": "Booking ID",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Event ID",
+              "displayName": "Event ID",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Old Start",
+              "displayName": "Old Start",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "New Start",
+              "displayName": "New Start",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "New End",
+              "displayName": "New End",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Changed At",
+              "displayName": "Changed At",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "value": {
+            "Booking ID": "={{ $(\"Check Conflict\").item.json.bookingId }}",
+            "Event ID": "={{ $(\"Check Conflict\").item.json.eventId }}",
+            "Email": "={{ $(\"Check Conflict\").item.json.email }}",
+            "Old Start": "={{ $(\"Check Conflict\").item.json.oldStart }}",
+            "New Start": "={{ $(\"Check Conflict\").item.json.newStart }}",
+            "New End": "={{ $(\"Check Conflict\").item.json.newEnd }}",
+            "Changed At": "={{ $now.toISO() }}"
+          },
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "477b071f-8311-4516-a76e-b7048b1dbfde",
+      "name": "Log Rescheduling History",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2016,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "u1",
+              "name": "success",
+              "type": "boolean",
+              "value": "={{ !!$('Update row in sheet').item.json['Booking ID'] }}"
+            },
+            {
+              "id": "u2",
+              "name": "bookingId",
+              "type": "string",
+              "value": "={{ $('Check Conflict').item.json.bookingId }}"
+            },
+            {
+              "id": "u3",
+              "name": "newStart",
+              "type": "string",
+              "value": "={{ $('Check Conflict').item.json.newStart }}"
+            },
+            {
+              "id": "u4",
+              "name": "message",
+              "type": "string",
+              "value": "={{ $('Update row in sheet').item.json['Booking ID'] ? 'Rescheduled booking ' + $('Check Conflict').item.json.bookingId + ' to ' + $('Check Conflict').item.json.label + '.' : 'The calendar moved but the database did not confirm. Tell the customer staff will confirm.' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "21ccd6a0-d39b-4162-9171-eef9c529c12a",
+      "name": "Reschedule Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "t1",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "t2",
+              "name": "message",
+              "value": "That new time overlaps another appointment. Check availability and offer a different time.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2fadd683-42d3-4349-b3f8-f41ef175beab",
+      "name": "Slot Taken",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1568,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "x1",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "x2",
+              "name": "message",
+              "value": "={{ $json.message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2a69acc2-d5e9-4e73-9b91-a48953bcee14",
+      "name": "Cannot Reschedule",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Check Conflict').item.json.email }}",
+        "subject": "=Appointment rescheduled – {{ $('Check Conflict').item.json.bookingId }}",
+        "emailType": "text",
+        "message": "=Hello,\n\nYour Hercules Detailing appointment {{ $('Check Conflict').item.json.bookingId }} ({{ $('Check Conflict').item.json.service }}) has been moved to {{ $('Check Conflict').item.json.label }}.\n\nIf this wasn't you, please contact us right away.\n\nHercules Detailing\nMon-Sat 8:00 AM - 6:00 PM",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "Hercules Detailing"
+        }
+      },
+      "id": "44bd003f-3265-47d3-b5ed-69c620e95231",
+      "name": "Send Reschedule Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2400,
+        0
+      ],
+      "webhookId": "103ffab3-7226-45ae-a345-6687cd219f58",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "z05gMQmKoaytEsJa",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Get Bookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Bookings": {
+      "main": [
+        [
+          {
+            "node": "Plan Reschedule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Reschedule": {
+      "main": [
+        [
+          {
+            "node": "Can Reschedule?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Can Reschedule?": {
+      "main": [
+        [
+          {
+            "node": "Get Overlapping Events",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cannot Reschedule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Overlapping Events": {
+      "main": [
+        [
+          {
+            "node": "Check Conflict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conflict": {
+      "main": [
+        [
+          {
+            "node": "Slot Free?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slot Free?": {
+      "main": [
+        [
+          {
+            "node": "Update an event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slot Taken",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update an event": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Log Rescheduling History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Rescheduling History": {
+      "main": [
+        [
+          {
+            "node": "Send Reschedule Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reschedule Email": {
+      "main": [
+        [
+          {
+            "node": "Reschedule Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "timezone": "America/New_York"
+  },
+  "versionId": "37736de0-5861-4ebe-bdba-67b4bd6fab37",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "10bcb785604853805d20dc557d497c83bb8101ab91677e89309f72489df54257"
+  },
+  "nodeGroups": [],
+  "id": "thAOEcxZeJ00t9ad",
+  "tags": []
+}

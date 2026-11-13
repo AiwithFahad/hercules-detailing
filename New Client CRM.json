@@ -1,0 +1,428 @@
+{
+  "name": "New Client CRM",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "email"
+            },
+            {
+              "name": "fullName"
+            },
+            {
+              "name": "phoneNumber"
+            },
+            {
+              "name": "vehicleMake"
+            },
+            {
+              "name": "vehicleModel"
+            },
+            {
+              "name": "vehicleYear"
+            },
+            {
+              "name": "vehicleType"
+            },
+            {
+              "name": "registration"
+            },
+            {
+              "name": "source"
+            }
+          ]
+        }
+      },
+      "id": "1e033ce7-d38b-4afb-95fe-1ee5d695c3a0",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Customers"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Email",
+              "lookupValue": "={{ String($json.email || \"\").trim().toLowerCase() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "897a7ca1-fd68-4883-9e1a-660dc51c79d9",
+      "name": "Find Existing Customer",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        96
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const i = $('When Executed by Another Workflow').first().json;\nconst existing = $('Find Existing Customer').first().json || {};\nconst email = String(i.email || '').trim().toLowerCase();\nconst name = String(i.fullName || '').trim();\nconst phone = String(i.phoneNumber || '').replace(/[^\\d+]/g, '');\nconst errors = [];\nif (!/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)) errors.push('a valid email address');\nif (!name) errors.push('full name');\nif (phone.replace(/\\D/g, '').length < 7) errors.push('a valid phone number');\nif (errors.length) return [{ json: { valid: false, success: false, message: 'Cannot register customer. Missing: ' + errors.join(', ') + '.' } }];\nconst isUpdate = !!existing.Email;\nconst keep = (k, v) => (v !== undefined && v !== null && String(v).trim() !== '') ? String(v).trim() : (existing[k] || '');\nreturn [{ json: {\n  valid: true,\n  isUpdate,\n  row: {\n    'Customer ID': existing['Customer ID'] || ('CUS-' + Date.now().toString(36).toUpperCase()),\n    Name: name,\n    Email: email,\n    Phone: \"'\" + phone,\n    'Vehicle Make': keep('Vehicle Make', i.vehicleMake),\n    'Vehicle Model': keep('Vehicle Model', i.vehicleModel),\n    'Vehicle Year': keep('Vehicle Year', i.vehicleYear),\n    'Vehicle Type': keep('Vehicle Type', i.vehicleType),\n    Registration: keep('Registration', i.registration),\n    'Created At': existing['Created At'] || new Date().toISOString(),\n    Source: existing.Source || i.source || 'voice'\n  }\n} }];"
+      },
+      "id": "7115b7e9-879e-4d56-8ae6-a44e759f6414",
+      "name": "Validate & Build Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4eeb0195-ab0e-4279-86a7-25b1cd3de812",
+      "name": "Is Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Customers"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Email"
+          ],
+          "schema": [
+            {
+              "id": "Customer ID",
+              "displayName": "Customer ID",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Vehicle Make",
+              "displayName": "Vehicle Make",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Vehicle Model",
+              "displayName": "Vehicle Model",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Vehicle Year",
+              "displayName": "Vehicle Year",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Vehicle Type",
+              "displayName": "Vehicle Type",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Registration",
+              "displayName": "Registration",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Created At",
+              "displayName": "Created At",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "value": {
+            "Customer ID": "={{ $json.row[\"Customer ID\"] }}",
+            "Name": "={{ $json.row.Name }}",
+            "Email": "={{ $json.row.Email }}",
+            "Phone": "={{ $json.row.Phone }}",
+            "Vehicle Make": "={{ $json.row[\"Vehicle Make\"] }}",
+            "Vehicle Model": "={{ $json.row[\"Vehicle Model\"] }}",
+            "Vehicle Year": "={{ $json.row[\"Vehicle Year\"] }}",
+            "Vehicle Type": "={{ $json.row[\"Vehicle Type\"] }}",
+            "Registration": "={{ $json.row.Registration }}",
+            "Created At": "={{ $json.row[\"Created At\"] }}",
+            "Source": "={{ $json.row.Source }}"
+          },
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "9dad267e-dbca-406c-84ff-938797fb3608",
+      "name": "Upsert Customer",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "success",
+              "value": "={{ !!$json.Email }}",
+              "type": "boolean"
+            },
+            {
+              "id": "r2",
+              "name": "customerId",
+              "value": "={{ $json[\"Customer ID\"] }}",
+              "type": "string"
+            },
+            {
+              "id": "r3",
+              "name": "message",
+              "value": "={{ $json.Email ? ($(\"Validate & Build Row\").first().json.isUpdate ? \"Existing customer record updated (no duplicate created).\" : \"New customer registered in the CRM.\") : \"The CRM did not confirm the save. Do not tell the customer they are registered.\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3ba135b9-4d5f-4a10-8384-a1a6d7f7e8e3",
+      "name": "Registration Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e1",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "e2",
+              "name": "message",
+              "value": "={{ $json.message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b7125468-a85d-41a0-ac5c-82278bc9d585",
+      "name": "Validation Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        192
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Find Existing Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Existing Customer": {
+      "main": [
+        [
+          {
+            "node": "Validate & Build Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Build Row": {
+      "main": [
+        [
+          {
+            "node": "Is Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid?": {
+      "main": [
+        [
+          {
+            "node": "Upsert Customer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Customer": {
+      "main": [
+        [
+          {
+            "node": "Registration Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "ade5f87b-b43c-436c-9951-2f49425e1d23",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "10bcb785604853805d20dc557d497c83bb8101ab91677e89309f72489df54257"
+  },
+  "nodeGroups": [],
+  "id": "YE3K7bL3IoT51myS",
+  "tags": []
+}

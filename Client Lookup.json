@@ -1,0 +1,153 @@
+{
+  "name": "Client Lookup",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "email"
+            },
+            {
+              "name": "phone"
+            }
+          ]
+        }
+      },
+      "id": "20425282-68ed-48bc-86d5-25e1c959435d",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Customers"
+        },
+        "options": {}
+      },
+      "id": "2b9d7312-4466-48f0-8e11-334497c9c008",
+      "name": "Get Customers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Bookings"
+        },
+        "options": {}
+      },
+      "id": "ac04949d-afe7-440b-9515-d99a0be05090",
+      "name": "Get Bookings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        0
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $('When Executed by Another Workflow').first().json;\nconst email = String(input.email || '').trim().toLowerCase();\nconst digits = (v) => String(v || '').replace(/\\D/g, '');\nconst phone = digits(input.phone);\nif (!email && phone.length < 7) {\n  return [{ json: { success: false, found: false, message: 'Please provide an email address or phone number to look up the customer.' } }];\n}\nconst customers = $('Get Customers').all().map(i => i.json).filter(r => r.Email || r.Phone);\nconst customer = customers.find(r => (email && String(r.Email || '').trim().toLowerCase() === email) || (phone.length >= 7 && digits(r.Phone).endsWith(phone.slice(-10))));\nif (!customer) {\n  return [{ json: { success: true, found: false, message: 'This is a new client. They do not exist in the CRM yet. Collect full name, email, phone and vehicle details, then register them.' } }];\n}\nconst cEmail = String(customer.Email || '').trim().toLowerCase();\nconst bookings = $('Get Bookings').all().map(i => i.json).filter(b => String(b.Email || '').trim().toLowerCase() === cEmail);\nconst now = Date.now();\nconst upcoming = bookings.filter(b => b.Status !== 'Cancelled' && new Date(b.Start).getTime() > now);\nconst vehicle = [customer['Vehicle Year'], customer['Vehicle Make'], customer['Vehicle Model']].filter(Boolean).join(' ');\nreturn [{ json: {\n  success: true,\n  found: true,\n  customer: { customerId: customer['Customer ID'], name: customer.Name, email: customer.Email, phone: String(customer.Phone || ''), vehicle, vehicleType: customer['Vehicle Type'] || '', registration: customer.Registration || '' },\n  totalBookings: bookings.length,\n  upcomingBookings: upcoming.map(b => ({ bookingId: b['Booking ID'], service: b.Service || b.Package, start: b.Start, status: b.Status })),\n  message: bookings.length ? `Returning customer ${customer.Name} with ${bookings.length} previous booking(s) and ${upcoming.length} upcoming.` : `This client exists in the CRM (${customer.Name}) but has no previous appointments with Hercules Detailing.`\n} }];"
+      },
+      "id": "feee0c2c-83f0-4ffb-893d-8b7a44842180",
+      "name": "Match Customer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Get Customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Customers": {
+      "main": [
+        [
+          {
+            "node": "Get Bookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Bookings": {
+      "main": [
+        [
+          {
+            "node": "Match Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "c2d5fcb2-d4cf-40ec-b77c-ef6589917e4e",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "10bcb785604853805d20dc557d497c83bb8101ab91677e89309f72489df54257"
+  },
+  "nodeGroups": [],
+  "id": "KOSRDqziBLlzRJhP",
+  "tags": []
+}

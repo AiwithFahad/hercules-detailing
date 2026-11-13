@@ -1,0 +1,120 @@
+{
+  "name": "Lookup Appointment",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "email"
+            },
+            {
+              "name": "phone"
+            },
+            {
+              "name": "bookingId"
+            },
+            {
+              "name": "afterTime"
+            },
+            {
+              "name": "beforeTime"
+            }
+          ]
+        }
+      },
+      "id": "c8c2de12-e800-4399-9cf2-ab13809ae67b",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1_5o8cLQ0Nk397_YeS_scsleggDGbjD65F4o2VxRal9s"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Bookings"
+        },
+        "options": {}
+      },
+      "id": "9969451a-b970-4c7a-b745-9dfedaf86bcb",
+      "name": "Get Bookings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "tuxGClshQRaxf6KV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const TZ = 'America/New_York';\nconst i = $('When Executed by Another Workflow').first().json;\nconst email = String(i.email || '').trim().toLowerCase();\nconst id = String(i.bookingId || '').trim().toUpperCase();\nconst digits = (v) => String(v || '').replace(/\\D/g, '');\nconst phone = digits(i.phone);\nif (!email && !id && phone.length < 7) return [{ json: { success: false, appointments: [], message: 'Ask for the email, phone number or booking ID used for the booking.' } }];\nconst after = i.afterTime ? new Date(i.afterTime).getTime() : Date.now() - 3600000;\nconst before = i.beforeTime ? new Date(i.beforeTime).getTime() : Infinity;\nconst rows = $input.all().map(r => r.json).filter(r => r['Booking ID']);\nconst matches = rows.filter(r => {\n  const byId = id && String(r['Booking ID']).toUpperCase() === id;\n  const byEmail = email && String(r.Email || '').trim().toLowerCase() === email;\n  const byPhone = phone.length >= 7 && digits(r.Phone).endsWith(phone.slice(-10));\n  if (!(byId || byEmail || byPhone)) return false;\n  if (byId) return true;\n  const t = new Date(r.Start).getTime();\n  return r.Status !== 'Cancelled' && t >= after && t <= before;\n});\nconst appointments = matches.map(r => ({ bookingId: r['Booking ID'], eventId: r['Event ID'], service: r.Service, vehicle: r.Vehicle, start: r.Start, end: r.End, status: r.Status, label: DateTime.fromISO(r.Start, { setZone: true }).setZone(TZ).toFormat(\"cccc d LLLL 'at' h:mm a\") }));\nreturn [{ json: { success: true, count: appointments.length, appointments, message: appointments.length ? appointments.map(a => `${a.service} on ${a.label} (booking ${a.bookingId}, ${a.status})`).join('; ') : 'No upcoming appointments found for those details.' } }];"
+      },
+      "id": "0747e80f-f2c0-49e3-a0d0-8258561a58e2",
+      "name": "Find Matching Bookings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Get Bookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Bookings": {
+      "main": [
+        [
+          {
+            "node": "Find Matching Bookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "68cec8cf-c9ad-42c2-8278-0b9500fe44a5",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "10bcb785604853805d20dc557d497c83bb8101ab91677e89309f72489df54257"
+  },
+  "nodeGroups": [],
+  "id": "NDOyXFtSCHH9TTHU",
+  "tags": []
+}

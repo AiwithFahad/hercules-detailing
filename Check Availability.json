@@ -1,0 +1,144 @@
+{
+  "name": "Check Availability",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "date"
+            },
+            {
+              "name": "service"
+            },
+            {
+              "name": "vehicleType"
+            },
+            {
+              "name": "afterTime"
+            },
+            {
+              "name": "beforeTime"
+            }
+          ]
+        }
+      },
+      "id": "c9e3f979-c2f9-4f31-9547-de4d64177723",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const TZ = 'America/New_York';\nconst OPEN = 8, CLOSE = 18;\nconst i = $input.first().json;\nconst DUR = { 'exterior hand wash': 60, 'maintenance': 60, 'interior deep clean': 120, 'leather & fabric care': 90, 'leather and fabric care': 90, 'wheels & engine bay': 90, 'wheels and engine bay': 90, 'full detail': 240, 'paint correction': 360, 'ceramic coating': 480, 'ceramic pro': 480 };\nconst svc = String(i.service || 'Full Detail').trim().toLowerCase();\nconst key = Object.keys(DUR).find(k => svc.includes(k)) || 'full detail';\nconst vt = String(i.vehicleType || '').toLowerCase();\nconst big = /suv|truck|van|pickup|classic|4x4|minivan/.test(vt);\nconst base = DUR[key];\nconst duration = Math.min(Math.ceil((big && base < 480 ? base * 1.25 : base) / 30) * 30, (CLOSE - OPEN) * 60);\nlet day = i.date ? DateTime.fromISO(String(i.date), { zone: TZ }) : (i.afterTime ? DateTime.fromISO(String(i.afterTime), { zone: TZ }) : DateTime.now().setZone(TZ).plus({ days: 1 }));\nif (!day.isValid) return [{ json: { valid: false, message: 'I could not understand that date. Please give a date like 2026-11-06.' } }];\nday = day.startOf('day');\nconst closed = day.weekday === 7;\nconst open = day.set({ hour: OPEN });\nconst close = day.set({ hour: CLOSE });\nreturn [{ json: { valid: true, closed, service: key, vehicleType: i.vehicleType || '', durationMinutes: duration, date: day.toISODate(), dayName: day.toFormat('cccc'), timeMin: open.toISO(), timeMax: close.toISO() } }];"
+      },
+      "id": "ff2aabf3-04df-4d01-b57f-c5a554095d04",
+      "name": "Build Business-Hours Window",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "fahadahmedshanawar@gmail.com"
+        },
+        "returnAll": true,
+        "timeMin": "={{ $json.timeMin }}",
+        "timeMax": "={{ $json.timeMax }}",
+        "options": {}
+      },
+      "id": "d9a235c5-9930-4ecf-8a13-4d20f82b9d37",
+      "name": "Get many events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        0
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "tuLMc4vpTEFITWB9",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const TZ = 'America/New_York';\nconst w = $('Build Business-Hours Window').first().json;\nif (!w.valid) return [{ json: { success: false, message: w.message } }];\nif (w.closed) return [{ json: { success: true, date: w.date, dayName: w.dayName, slots: [], message: 'Hercules Detailing is closed on Sundays. We are open Monday to Saturday, 8 AM to 6 PM.' } }];\nconst busy = $input.all().map(e => e.json).filter(e => e && e.start && e.status !== 'cancelled' && e.transparency !== 'transparent').map(e => ({ s: DateTime.fromISO(e.start.dateTime || e.start.date, { zone: TZ }), e: DateTime.fromISO(e.end.dateTime || e.end.date, { zone: TZ }) }));\nconst open = DateTime.fromISO(w.timeMin, { zone: TZ });\nconst close = DateTime.fromISO(w.timeMax, { zone: TZ });\nconst now = DateTime.now().setZone(TZ).plus({ minutes: 60 });\nconst slots = [];\nfor (let t = open; t.plus({ minutes: w.durationMinutes }) <= close; t = t.plus({ minutes: 30 })) {\n  const end = t.plus({ minutes: w.durationMinutes });\n  if (t < now) continue;\n  if (busy.some(b => t < b.e && end > b.s)) continue;\n  slots.push({ start: t.toISO(), end: end.toISO(), label: t.toFormat('h:mm a') });\n}\nconst preview = slots.slice(0, 6).map(s => s.label).join(', ');\nreturn [{ json: { success: true, date: w.date, dayName: w.dayName, service: w.service, durationMinutes: w.durationMinutes, slots, message: slots.length ? `${w.dayName} ${w.date}: ${slots.length} start times available for a ${w.durationMinutes}-minute ${w.service}. Earliest: ${preview}.` : `No openings long enough for a ${w.durationMinutes}-minute ${w.service} on ${w.dayName} ${w.date}. Offer another day.` } }];"
+      },
+      "id": "116b500e-5dc4-4b03-b645-0c98ece7fd3f",
+      "name": "Compute Free Slots",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Build Business-Hours Window",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Business-Hours Window": {
+      "main": [
+        [
+          {
+            "node": "Get many events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many events": {
+      "main": [
+        [
+          {
+            "node": "Compute Free Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "timezone": "America/New_York"
+  },
+  "versionId": "4cdbd870-bb60-409c-b4fd-b0708fc2e58b",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "10bcb785604853805d20dc557d497c83bb8101ab91677e89309f72489df54257"
+  },
+  "nodeGroups": [],
+  "id": "fWLvHyyDDIsRVvh7",
+  "tags": []
+}
